@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>US Military Presence in Germany</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --army: #4a7c59;
+    --airforce: #1a3a5c;
+    --joint: #7a4a1a;
+    --closing: #8b0000;
+    --bg: #0d0d0d;
+    --panel: #141414;
+    --border: #2a2a2a;
+    --accent: #c8a84b;
+    --text: #e8e0d0;
+    --muted: #666;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.7rem;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+
+  header .sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  header .troop-count {
+    margin-left: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .filters {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .filters label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .filter-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .filter-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .filter-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
+
+  .filter-btn:hover:not(.active) {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .base-list {
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .base-list::-webkit-scrollbar { width: 4px; }
+  .base-list::-webkit-scrollbar-track { background: transparent; }
+  .base-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .base-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .base-item:hover { background: #1e1e1e; }
+  .base-item.active { background: #1e1e1e; border-left: 2px solid var(--accent); }
+
+  .base-item .name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+
+  .base-item .location {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+  }
+
+  .base-item .branch-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.55rem;
+    padding: 2px 6px;
+    display: inline-block;
+    margin-top: 4px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* MAP */
+  #map {
+    flex: 1;
+  }
+
+  /* DETAIL PANEL */
+  .detail-panel {
+    width: 290px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .detail-panel::-webkit-scrollbar { width: 4px; }
+  .detail-panel::-webkit-scrollbar-track { background: transparent; }
+  .detail-panel::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .detail-placeholder {
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-align: center;
+    margin-top: 40px;
+    line-height: 1.8;
+  }
+
+  .detail-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: 0.05em;
+    color: var(--accent);
+    line-height: 1.1;
+  }
+
+  .detail-loc {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .detail-branch {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    padding: 3px 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .detail-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .detail-section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.55rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 6px;
+  }
+
+  .detail-mission {
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: #aaa;
+  }
+
+  .detail-units {
+    list-style: none;
+  }
+
+  .detail-units li {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: #999;
+    padding: 4px 0;
+    border-bottom: 1px solid #1e1e1e;
+    letter-spacing: 0.02em;
+  }
+
+  .detail-units li::before {
+    content: '▸ ';
+    color: var(--accent);
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .stat-box {
+    flex: 1;
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+  }
+
+  .stat-box .val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+
+  .stat-box .lbl {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.5rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .closing-badge {
+    background: #3a0000;
+    border: 1px solid #8b0000;
+    color: #ff6666;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    padding: 4px 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: inline-block;
+  }
+
+  /* Leaflet overrides */
+  .leaflet-container {
+    background: #111 !important;
+  }
+
+  .leaflet-tile {
+    filter: none;
+  }
+
+  .leaflet-popup-content-wrapper {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .leaflet-popup-tip { background: var(--panel); }
+  .leaflet-popup-close-button { color: var(--muted) !important; }
+
+  .popup-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+
+  .popup-loc {
+    font-size: 0.6rem;
+    color: var(--muted);
+    margin-top: 2px;
+    letter-spacing: 0.08em;
+  }
+
+  .popup-branch {
+    font-size: 0.55rem;
+    margin-top: 6px;
+    padding: 2px 7px;
+    display: inline-block;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 900px) {
+    .sidebar { width: 220px; }
+    .detail-panel { width: 230px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>US Military Presence — Germany</h1>
+  <span class="sub">Active installations · 2026</span>
+  <div class="troop-count">~36,400 personnel · src: MilitaryOneSource + DoD</div>
+</header>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="filters">
+      <label>Filter by branch</label>
+      <div class="filter-btns">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="Air Force">Air Force</button>
+        <button class="filter-btn" data-filter="Army">Army</button>
+        <button class="filter-btn" data-filter="Joint/NATO">Joint / NATO</button>
+      </div>
+    </div>
+    <div class="base-list" id="baseList"></div>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-placeholder">← SELECT A BASE<br>to view details</div>
+  </div>
+</div>
+
+<script>
+const BASES = [
+  {
+    name: "Ramstein Air Base",
+    location: "Ramstein-Miesenbach, Rhineland-Palatinate",
+    lat: 49.4369, lng: 7.6003,
+    branch: "Air Force",
+    inUse: "1953–Present",
+    closing: false,
+    personnel: "~57,000 total community",
+    mission: "Headquarters for USAF operations in Europe and Africa. NATO Allied Air Command is also based here. Largest US military installation in Germany and a global hub for drone operations and humanitarian airlifts.",
+    units: [
+      "HQ US Air Forces in Europe – Air Forces Africa (USAFE-AFAFRICA)",
+      "Third Air Force",
+      "86th Airlift Wing",
+      "435th Air Ground Operations Wing",
+      "521st Air Mobility Operations Wing",
+      "NATO Allied Air Command"
+    ]
+  },
+  {
+    name: "Spangdahlem Air Base",
+    location: "Spangdahlem, Rhineland-Palatinate",
+    lat: 49.9727, lng: 6.6925,
+    branch: "Air Force",
+    inUse: "1952–Present",
+    closing: false,
+    personnel: "~10,000 total community",
+    mission: "NATO air base with USAF as primary tenant. Home of the 52nd Fighter Wing, specializing in suppression of enemy air defenses (SEAD). Hosts F-35A aircraft under NATO nuclear sharing arrangements.",
+    units: [
+      "52nd Fighter Wing",
+      "480th Fighter Squadron",
+      "521st Air Mobility Operations Wing",
+      "726th Air Mobility Squadron"
+    ]
+  },
+  {
+    name: "USAG Wiesbaden (Clay Kaserne)",
+    location: "Wiesbaden-Erbenheim, Hesse",
+    lat: 50.0506, lng: 8.3423,
+    branch: "Army",
+    inUse: "1945–Present",
+    closing: false,
+    personnel: "~56,000 total community",
+    mission: "Headquarters of US Army Europe and Africa (USAREUR-AF). Commands 15 installations and housing areas in the greater Wiesbaden area. Also home to the 56th Artillery Command and emerging long-range missile programs (Dark Eagle).",
+    units: [
+      "HQ US Army Europe and Africa (USAREUR-AF)",
+      "56th Artillery Command",
+      "66th Military Intelligence Brigade",
+      "Dagger Complex (Darmstadt sub-installation)"
+    ]
+  },
+  {
+    name: "USAG Stuttgart",
+    location: "Stuttgart-Vaihingen, Baden-Württemberg",
+    lat: 48.7352, lng: 9.0753,
+    branch: "Joint/NATO",
+    inUse: "1945–Present",
+    closing: false,
+    personnel: "~20,000+ total community",
+    mission: "Home of US European Command (EUCOM) and US Africa Command (AFRICOM). Strategic hub for all US military operations in Europe and across the African continent. Also hosts Special Operations Command Europe (SOCEUR).",
+    units: [
+      "US European Command (EUCOM) – Patch Barracks",
+      "US Africa Command (AFRICOM)",
+      "Special Operations Command Europe (SOCEUR)",
+      "Naval Forces Europe / Naval Forces Africa"
+    ]
+  },
+  {
+    name: "USAG Bavaria – Grafenwöhr",
+    location: "Grafenwöhr, Bavaria",
+    lat: 49.7008, lng: 11.9144,
+    branch: "Army",
+    inUse: "1945–Present",
+    closing: false,
+    personnel: "~16,240 active duty",
+    mission: "Largest US Army training area in Europe at over 223 km². Headquarters of USAG Bavaria. Central training hub for NATO forces and key base for Ukrainian soldier training and equipment staging since 2022.",
+    units: [
+      "7th Army Training Command",
+      "172nd Infantry Brigade",
+      "Joint Multinational Training Group – Ukraine"
+    ]
+  },
+  {
+    name: "Rose Barracks – Vilseck",
+    location: "Vilseck, Bavaria",
+    lat: 49.6333, lng: 11.7833,
+    branch: "Army",
+    inUse: "1952–Present",
+    closing: false,
+    personnel: "~10,000 total community",
+    mission: "Major combat garrison within USAG Bavaria. Home of the 2nd Cavalry Regiment and 18th Military Police Brigade. Part of the same garrison command as Grafenwöhr.",
+    units: [
+      "2nd Cavalry Regiment (Stryker)",
+      "18th Military Police Brigade",
+      "12th Combat Aviation Brigade (element)"
+    ]
+  },
+  {
+    name: "USAG Hohenfels",
+    location: "Hohenfels, Bavaria",
+    lat: 49.2167, lng: 11.8167,
+    branch: "Army",
+    inUse: "1951–Present",
+    closing: false,
+    personnel: "~5,000 total community",
+    mission: "Training installation within USAG Bavaria. Hosts the Joint Multinational Readiness Center (JMRC), one of the primary combat training centers for NATO forces in Europe.",
+    units: [
+      "Joint Multinational Readiness Center (JMRC)",
+      "173rd Airborne Brigade (rotational)"
+    ]
+  },
+  {
+    name: "USAG Ansbach",
+    location: "Katterbach / Ansbach, Bavaria",
+    lat: 49.3020, lng: 10.5731,
+    branch: "Army",
+    inUse: "1935–Present",
+    closing: false,
+    personnel: "~8,000 total community",
+    mission: "Army aviation garrison in northern Bavaria. Originally built by the Luftwaffe in 1935. Home to combat aviation units and air defense elements.",
+    units: [
+      "12th Combat Aviation Brigade",
+      "5th Battalion, 4th Air Defense Artillery",
+      "7th Army Training Command (element)"
+    ]
+  },
+  {
+    name: "Landstuhl Regional Medical Center",
+    location: "Landstuhl, Rhineland-Palatinate",
+    lat: 49.4083, lng: 7.5722,
+    branch: "Joint/NATO",
+    inUse: "1953–Present",
+    closing: false,
+    personnel: "~2,000 staff",
+    mission: "Largest US military hospital outside the continental United States. Primary trauma and medical care facility for casualties from operations in Europe, Africa, and the Middle East.",
+    units: [
+      "Landstuhl Regional Medical Center (LRMC)",
+      "Europe Regional Medical Command"
+    ]
+  },
+  {
+    name: "USAG Garmisch",
+    location: "Garmisch-Partenkirchen, Bavaria",
+    lat: 47.4917, lng: 11.0950,
+    branch: "Army",
+    inUse: "1945–Present",
+    closing: false,
+    personnel: "~1,000 community",
+    mission: "Home of the Marshall Center (George C. Marshall European Center for Security Studies), a NATO-affiliated academic institution for security policy. Also includes the Edelweiss Lodge and Resort for military recreation.",
+    units: [
+      "George C. Marshall European Center for Security Studies",
+      "Edelweiss Lodge and Resort (AFRC)"
+    ]
+  },
+  {
+    name: "Dagger Complex",
+    location: "Darmstadt-Griesheim, Hesse",
+    lat: 49.8522, lng: 8.5469,
+    branch: "Joint/NATO",
+    inUse: "1945–closing",
+    closing: true,
+    personnel: "Classified / limited",
+    mission: "Former Army intelligence and NSA processing/analysis center. Downgraded to a data center after a new facility was built in Wiesbaden. Scheduled for closure.",
+    units: [
+      "NSA / signals intelligence functions (former)",
+      "Data center operations (transitional)"
+    ]
+  },
+  {
+    name: "Büchel Air Base",
+    location: "Büchel, Rhineland-Palatinate",
+    lat: 50.1733, lng: 7.0633,
+    branch: "Joint/NATO",
+    inUse: "NATO nuclear sharing",
+    closing: false,
+    personnel: "German-operated, US nuclear custodians",
+    mission: "German Luftwaffe base hosting US B61 nuclear gravity bombs under NATO nuclear sharing arrangements. Currently undergoing major construction upgrades for nuclear-certified F-35A jets to replace Tornado aircraft.",
+    units: [
+      "Tactical Air Wing 33 (Bundeswehr, primary operator)",
+      "US nuclear custody detachment"
+    ]
+  },
+  {
+    name: "Geilenkirchen NATO Air Base",
+    location: "Geilenkirchen, North Rhine-Westphalia",
+    lat: 50.9608, lng: 6.0425,
+    branch: "Joint/NATO",
+    inUse: "1968–Present",
+    closing: false,
+    personnel: "~1,800 personnel from 16 NATO nations",
+    mission: "NATO's only permanently deployed airborne early warning force. Operates the E-3A Sentry AWACS (Airborne Warning and Control System) aircraft for all-weather surveillance, command and control over NATO airspace. Listed as an active installation on MilitaryOneSource.",
+    units: [
+      "NATO Airborne Early Warning & Control Force (NAEWCF)",
+      "E-3A Component (NATO AWACS fleet)",
+      "Multinational crews from 16 NATO member states"
+    ]
+  },
+  {
+    name: "USAG Rheinland-Pfalz – Baumholder",
+    location: "Baumholder, Rhineland-Palatinate",
+    lat: 49.6442, lng: 7.3368,
+    branch: "Army",
+    inUse: "1951–Present",
+    closing: false,
+    personnel: "~8,000 military personnel",
+    mission: "Major training hub within USAG Rheinland-Pfalz. Listed separately on MilitaryOneSource from the Kaiserslautern community. Hosts special forces exercises and field training for NATO units, with Smith Barracks as its primary installation.",
+    units: [
+      "Smith Barracks (primary)",
+      "40th Engineer Battalion",
+      "USAG Rheinland-Pfalz (sub-command)"
+    ]
+  }
+];
+
+const BRANCH_COLORS = {
+  "Air Force": { color: "#1a3a5c", accent: "#4a90d9", label: "AIR FORCE" },
+  "Army":      { color: "#2a4a2a", accent: "#4a7c59", label: "ARMY" },
+  "Joint/NATO":{ color: "#4a3a1a", accent: "#c8a84b", label: "JOINT / NATO" },
+};
+
+// Map init
+const map = L.map('map', {
+  center: [50.1, 9.8],
+  zoom: 6,
+  zoomControl: false,
+  attributionControl: false
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19,
+  attribution: '© OpenStreetMap, © CARTO'
+}).addTo(map);
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Custom marker SVG
+function makeIcon(branch, closing) {
+  const c = BRANCH_COLORS[branch];
+  const fillColor = closing ? '#8b0000' : c.accent;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38">
+    <polygon points="15,2 28,12 28,30 15,36 2,30 2,12" fill="${fillColor}" stroke="#000" stroke-width="1.5" opacity="0.92"/>
+    <polygon points="15,8 22,13 22,25 15,29 8,25 8,13" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+  </svg>`;
+  return L.divIcon({
+    className: '',
+    html: svg,
+    iconSize: [30, 38],
+    iconAnchor: [15, 36],
+    popupAnchor: [0, -38]
+  });
+}
+
+let markers = {};
+let activeBase = null;
+
+function selectBase(base) {
+  activeBase = base;
+
+  // Fly to
+  map.flyTo([base.lat, base.lng], 9, { duration: 0.8 });
+
+  // Open popup
+  if (markers[base.name]) {
+    markers[base.name].openPopup();
+  }
+
+  // Update sidebar highlight
+  document.querySelectorAll('.base-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.name === base.name);
+  });
+
+  // Update detail panel
+  renderDetail(base);
+}
+
+function renderDetail(base) {
+  const c = BRANCH_COLORS[base.branch];
+  const panel = document.getElementById('detailPanel');
+  panel.innerHTML = `
+    <div>
+      ${base.closing ? '<div class="closing-badge">⚠ Scheduled for Closure</div><br>' : ''}
+      <div class="detail-name">${base.name}</div>
+      <div class="detail-loc">${base.location}</div>
+    </div>
+    <div>
+      <span class="detail-branch" style="background:${c.color}22;border:1px solid ${c.accent};color:${c.accent}">
+        ${c.label}
+      </span>
+    </div>
+    <hr class="detail-divider">
+    <div class="stat-row">
+      <div class="stat-box">
+        <div class="val">${base.inUse.split('–')[0]}</div>
+        <div class="lbl">Est.</div>
+      </div>
+      <div class="stat-box" style="border-left:none">
+        <div class="val" style="font-size:0.75rem;line-height:1.3;padding-top:2px">${base.personnel}</div>
+        <div class="lbl">Personnel</div>
+      </div>
+    </div>
+    <div>
+      <div class="detail-section-label">Mission</div>
+      <div class="detail-mission">${base.mission}</div>
+    </div>
+    <div>
+      <div class="detail-section-label">Key Units</div>
+      <ul class="detail-units">
+        ${base.units.map(u => `<li>${u}</li>`).join('')}
+      </ul>
+    </div>
+  `;
+}
+
+function buildList(filter) {
+  const list = document.getElementById('baseList');
+  list.innerHTML = '';
+  BASES.filter(b => filter === 'all' || b.branch === filter).forEach(base => {
+    const c = BRANCH_COLORS[base.branch];
+    const item = document.createElement('div');
+    item.className = 'base-item' + (activeBase?.name === base.name ? ' active' : '');
+    item.dataset.name = base.name;
+    item.innerHTML = `
+      <div class="name">${base.name}${base.closing ? ' <span style="color:#ff6666;font-size:0.6rem">CLOSING</span>' : ''}</div>
+      <div class="location">${base.location.split(',')[0]}</div>
+      <span class="branch-tag" style="background:${c.color}33;color:${c.accent}">${c.label}</span>
+    `;
+    item.addEventListener('click', () => selectBase(base));
+    list.appendChild(item);
+  });
+}
+
+function buildMarkers(filter) {
+  Object.values(markers).forEach(m => map.removeLayer(m));
+  markers = {};
+
+  BASES.filter(b => filter === 'all' || b.branch === filter).forEach(base => {
+    const c = BRANCH_COLORS[base.branch];
+    const marker = L.marker([base.lat, base.lng], { icon: makeIcon(base.branch, base.closing) });
+
+    const popupContent = `
+      <div class="popup-name">${base.name}</div>
+      <div class="popup-loc">${base.location}</div>
+      <div class="popup-branch" style="background:${c.color}22;border:1px solid ${c.accent};color:${c.accent}">${c.label}</div>
+    `;
+
+    marker.bindPopup(popupContent, { maxWidth: 220 });
+    marker.on('click', () => selectBase(base));
+    marker.addTo(map);
+    markers[base.name] = marker;
+  });
+}
+
+// Filter logic
+let currentFilter = 'all';
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    buildList(currentFilter);
+    buildMarkers(currentFilter);
+  });
+});
+
+// Init
+buildList('all');
+buildMarkers('all');
+</script>
+</body>
+</html>
